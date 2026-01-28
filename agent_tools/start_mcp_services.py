@@ -29,6 +29,7 @@ class MCPServiceManager:
             "trade": int(os.getenv("TRADE_HTTP_PORT", "8002")),
             "price": int(os.getenv("GETPRICE_HTTP_PORT", "8003")),
             "crypto": int(os.getenv("CRYPTO_HTTP_PORT", "8005")),
+            "futu": int(os.getenv("FUTU_TRADE_HTTP_PORT", "8010")),
         }
 
         # Service configurations
@@ -40,6 +41,7 @@ class MCPServiceManager:
             "trade": {"script": os.path.join(mcp_server_dir, "tool_trade.py"), "name": "TradeTools", "port": self.ports["trade"]},
             "price": {"script": os.path.join(mcp_server_dir, "tool_get_price_local.py"), "name": "LocalPrices", "port": self.ports["price"]},
             "crypto": {"script": os.path.join(mcp_server_dir, "tool_crypto_trade.py"), "name": "CryptoTradeTools", "port": self.ports["crypto"]},
+            "futu": {"script": os.path.join(mcp_server_dir, "tool_futu_trade.py"), "name": "FutuTradeTools", "port": self.ports["futu"]},
         }
 
         # Create logs directory

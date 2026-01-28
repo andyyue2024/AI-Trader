@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: 'AI-Trader'
+    orgId: 1
+    folder: 'AI-Trader'
+    folderUid: 'ai-trader'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

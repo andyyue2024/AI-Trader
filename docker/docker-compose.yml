@@ -1,0 +1,115 @@
+# AI-Trader 高频交易系统 Docker Compose 配置
+# 包含：AI-Trader + Prometheus + Grafana
+
+version: '3.8'
+
+services:
+  # AI-Trader 高频交易服务
+  ai-trader:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: ai-trader-hft
+    restart: unless-stopped
+    environment:
+      # OpenD 连接配置
+      - OPEND_HOST=${OPEND_HOST:-host.docker.internal}
+      - OPEND_PORT=${OPEND_PORT:-11111}
+      - OPEND_TRD_ENV=${OPEND_TRD_ENV:-1}
+      - OPEND_TRADE_PASSWORD=${OPEND_TRADE_PASSWORD:-}
+
+      # OpenAI 配置
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
+
+      # 飞书告警
+      - FEISHU_WEBHOOK_URL=${FEISHU_WEBHOOK_URL:-}
+      - FEISHU_WEBHOOK_SECRET=${FEISHU_WEBHOOK_SECRET:-}
+
+      # 交易配置
+      - INITIAL_CASH=${INITIAL_CASH:-50000}
+      - DRY_RUN=${DRY_RUN:-true}
+      - SYMBOLS=${SYMBOLS:-TQQQ,QQQ}
+    ports:
+      - "9090:9090"   # Prometheus 指标
+      - "8010:8010"   # Futu Trade MCP 服务
+    volumes:
+      - ../data:/app/data
+      - ../logs:/app/logs
+      - ../configs:/app/configs:ro
+    networks:
+      - ai-trader-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      python main_hft.py 
+      --symbols ${SYMBOLS:-TQQQ QQQ}
+      ${DRY_RUN:+--dry-run}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Prometheus 监控
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: ai-trader-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - ai-trader-network
+    depends_on:
+      - ai-trader
+
+  # Grafana 可视化
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: ai-trader-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - ai-trader-network
+    depends_on:
+      - prometheus
+
+  # 可选：Redis 缓存（用于分布式部署）
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: ai-trader-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - ai-trader-network
+
+networks:
+  ai-trader-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  # redis-data:

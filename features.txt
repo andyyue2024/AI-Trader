@@ -1,0 +1,34 @@
+一、待完成功能列表：
+1.1 页面窗口
+Web UI 界面开发  (FastAPI + 仪表盘)
+PC 客户端 (计划中) x
+
+1.2 报告生成
+支持生成 PDF 格式报告
+支持生成 Excel 格式报告
+实现报告模板自定义
+实现定时生成和发送报告功能
+
+1.3 监控
+增强错误日志  (ErrorTracker)
+添加性能监控  (PerformanceMonitor)
+系统仪表盘 (SystemDashboard)
+
+二、待办事项
+2.1 OpenD 运行环境选择
+ - 富途 OpenD 需要 GUI 或虚拟帧缓冲 (Xvfb) 支持，Docker 方案选择:
+  A) 宿主机运行 OpenD + 容器连接
+  B) Docker 内 Xvfb 模拟
+  C) 官方 OpenD Docker 镜像 (如可用)
+  推荐方案 A 以降低复杂度。
+2.2账户类型与 API 权限
+确认真实交易账户和模拟账户，已开通美股期权 API 权限 (用于后续 SPXL/SOXL/期权交易)
+2.3行情数据合规性
+富途免费行情有延迟，1 分钟级别实时行情需要 付费订阅 Level 1/Level 2 行情权限，已购买
+2.4单元测试覆盖策略
+建议采用 pytest + pytest-asyncio 框架，Mock OpenD API 进行单元测试，集成测试使用模拟账户实盘验证
+2.5 Futu OpenD延迟优化的进一步考虑：
+使用持久性TCP连接、本地OpenD部署（非云端）和二进制协议。 (ConnectionPool)
+已确认OpenD账户在美前/后交易市场的权限  (SessionManager)
+
+

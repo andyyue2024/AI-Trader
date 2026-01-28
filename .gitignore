@@ -113,7 +113,7 @@ plan.md
 design.md
 deprecated/
 *_SUCCESS.md
-test_*.py
+# test_*.py
 *.backup
 /data/*_test_agent/
 *__test*

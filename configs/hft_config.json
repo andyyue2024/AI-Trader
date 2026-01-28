@@ -1,0 +1,54 @@
+{
+  "agent_type": "HighFrequencyTrader",
+  "market": "us",
+  "symbols": ["TQQQ", "QQQ"],
+  "trading": {
+    "initial_cash": 50000.0,
+    "max_position_per_symbol": 0.20,
+    "trading_interval": 60,
+    "enable_premarket": true,
+    "enable_afterhours": true,
+    "min_volume_threshold": 100000,
+    "min_daily_turnover": 50000
+  },
+  "risk": {
+    "daily_loss_limit": 0.03,
+    "max_drawdown": 0.15,
+    "max_slippage": 0.002,
+    "consecutive_loss_limit": 5,
+    "single_trade_max_loss": 0.01,
+    "auto_circuit_breaker": true,
+    "circuit_breaker_recovery_time": 300
+  },
+  "performance": {
+    "target_loop_time_ms": 1000,
+    "target_order_latency_ms": 1.4,
+    "target_fill_rate": 0.95,
+    "target_sharpe_ratio": 2.0
+  },
+  "futu": {
+    "host": "127.0.0.1",
+    "port": 11111,
+    "trd_env": 1,
+    "market": "US",
+    "pool_size": 3
+  },
+  "monitoring": {
+    "metrics_port": 9090,
+    "enable_feishu": true,
+    "feishu_webhook": "",
+    "feishu_secret": "",
+    "alert_quiet_hours_start": 0,
+    "alert_quiet_hours_end": 6
+  },
+  "model": {
+    "name": "gpt-4",
+    "signature": "ai-trader-hft",
+    "enabled": true
+  },
+  "log_config": {
+    "log_path": "./data/hft_data",
+    "log_level": "INFO"
+  },
+  "comment": "TQQQ/QQQ 高频交易配置 - 目标: 夏普≥2, 回撤≤15%, 滑点≤0.2%, 日成交≥5万美金, 成交率≥95%"
+}
