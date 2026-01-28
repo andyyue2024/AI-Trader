@@ -1,0 +1,521 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "panels": [],
+      "title": "📊 Performance Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0},
+              {"color": "green", "value": 1000}
+            ]
+          },
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 1},
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto"
+      },
+      "targets": [
+        {"expr": "ai_trader_total_equity", "refId": "A"}
+      ],
+      "title": "Total Equity",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 0},
+              {"color": "green", "value": 100}
+            ]
+          },
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 1},
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "targets": [
+        {"expr": "ai_trader_daily_pnl", "refId": "A"}
+      ],
+      "title": "Daily P&L",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "green", "value": 2}
+            ]
+          }
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 1},
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "targets": [
+        {"expr": "ai_trader_sharpe_ratio", "refId": "A"}
+      ],
+      "title": "Sharpe Ratio (≥2)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 15}
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 1},
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {"expr": "ai_trader_max_drawdown * 100", "refId": "A"}
+      ],
+      "title": "Max Drawdown (≤15%)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 90},
+              {"color": "green", "value": 95}
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 1},
+      "id": 6,
+      "targets": [
+        {"expr": "ai_trader_fill_rate * 100", "refId": "A"}
+      ],
+      "title": "Fill Rate (≥95%)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 30000},
+              {"color": "green", "value": 50000}
+            ]
+          },
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 1},
+      "id": 7,
+      "targets": [
+        {"expr": "ai_trader_daily_volume", "refId": "A"}
+      ],
+      "title": "Daily Volume (≥$50k)",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5},
+      "id": 8,
+      "title": "📈 Equity Curve",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "scheme",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {"group": "A", "mode": "none"},
+            "thresholdsStyle": {"mode": "off"}
+          },
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": []},
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 6},
+      "id": 9,
+      "options": {
+        "legend": {"calcs": ["lastNotNull", "max", "min"], "displayMode": "table", "placement": "bottom"},
+        "tooltip": {"mode": "single", "sort": "none"}
+      },
+      "targets": [
+        {"expr": "ai_trader_total_equity", "legendFormat": "Equity", "refId": "A"}
+      ],
+      "title": "Equity Curve",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 80}
+            ]
+          }
+        }
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 6},
+      "id": 10,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {"expr": "ai_trader_win_rate * 100", "refId": "A"}
+      ],
+      "title": "Win Rate",
+      "type": "gauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "green", "value": 1}
+            ]
+          }
+        }
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 10},
+      "id": 11,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "targets": [
+        {"expr": "ai_trader_profit_factor", "refId": "A"}
+      ],
+      "title": "Profit Factor",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14},
+      "id": 12,
+      "title": "⚡ Latency Monitoring",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never"
+          },
+          "unit": "ms"
+        }
+      },
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 15},
+      "id": 13,
+      "targets": [
+        {"expr": "ai_trader_order_latency_ms", "legendFormat": "Order Latency", "refId": "A"},
+        {"expr": "ai_trader_loop_time_ms", "legendFormat": "Loop Time", "refId": "B"}
+      ],
+      "title": "Execution Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 1.4}
+            ]
+          },
+          "unit": "ms"
+        }
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 12, "y": 15},
+      "id": 14,
+      "options": {"colorMode": "background", "graphMode": "area"},
+      "targets": [
+        {"expr": "ai_trader_order_latency_ms", "refId": "A"}
+      ],
+      "title": "Order Latency (≤1.4ms)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 800},
+              {"color": "red", "value": 1000}
+            ]
+          },
+          "unit": "ms"
+        }
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 18, "y": 15},
+      "id": 15,
+      "targets": [
+        {"expr": "ai_trader_loop_time_ms", "refId": "A"}
+      ],
+      "title": "Loop Time (≤1000ms)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.1},
+              {"color": "red", "value": 0.2}
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 12, "y": 18},
+      "id": 16,
+      "targets": [
+        {"expr": "ai_trader_avg_slippage * 100", "refId": "A"}
+      ],
+      "title": "Avg Slippage (≤0.2%)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}
+        }
+      },
+      "gridPos": {"h": 3, "w": 6, "x": 18, "y": 18},
+      "id": 17,
+      "targets": [
+        {"expr": "ai_trader_total_trades", "refId": "A"}
+      ],
+      "title": "Total Trades",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 21},
+      "id": 18,
+      "title": "🛡️ Risk Control",
+      "type": "row"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 2},
+              {"color": "red", "value": 3}
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 22},
+      "id": 19,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {"expr": "ai_trader_daily_loss * 100", "refId": "A"}
+      ],
+      "title": "Daily Loss (3% Halt)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"options": {"0": {"color": "green", "text": "Active"}}, "type": "value"},
+            {"options": {"1": {"color": "red", "text": "HALTED"}}, "type": "value"}
+          ]
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 22},
+      "id": 20,
+      "targets": [
+        {"expr": "ai_trader_circuit_breaker_triggered", "refId": "A"}
+      ],
+      "title": "Circuit Breaker",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"options": {"match": "null", "result": {"text": "N/A"}}},
+            {"options": {"pre_market": {"text": "🌅 Pre-Market"}}, "type": "value"},
+            {"options": {"regular": {"text": "📈 Regular"}}, "type": "value"},
+            {"options": {"after_hours": {"text": "🌙 After-Hours"}}, "type": "value"},
+            {"options": {"closed": {"text": "🔒 Closed"}}, "type": "value"}
+          ]
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 22},
+      "id": 21,
+      "targets": [
+        {"expr": "ai_trader_market_session", "refId": "A"}
+      ],
+      "title": "Market Session",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"options": {"0": {"color": "red", "text": "Stopped"}}, "type": "value"},
+            {"options": {"1": {"color": "green", "text": "Running"}}, "type": "value"}
+          ]
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 22},
+      "id": 22,
+      "targets": [
+        {"expr": "ai_trader_is_running", "refId": "A"}
+      ],
+      "title": "System Status",
+      "type": "stat"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["ai-trader", "hft", "trading"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AI-Trader HFT Dashboard",
+  "uid": "ai-trader-hft",
+  "version": 1,
+  "weekStart": ""
+}

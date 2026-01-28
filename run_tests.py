@@ -32,6 +32,9 @@ def run_tests():
             "--cov=futu",
             "--cov=risk_control",
             "--cov=monitoring",
+            "--cov=backtest",
+            "--cov=web",
+            "--cov=reports",
             "--cov-report=term-missing",
             "--cov-report=html:coverage_report",
             "-x"  # 遇到第一个失败就停止

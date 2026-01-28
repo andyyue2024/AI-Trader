@@ -43,6 +43,12 @@
 - ✅ **Options Trading Support** - Full options trading with strategies: straddle, strangle, bull/bear spreads
 - ✅ **Docker Deployment** - Complete containerization with Prometheus + Grafana monitoring stack
 - ✅ **Feishu Alerts** - 5-minute exception notification via Feishu webhook
+- ✅ **Web Dashboard** - FastAPI-based real-time monitoring dashboard with WebSocket updates
+- ✅ **Report Generation** - PDF/Excel report generation with customizable templates
+- ✅ **Backtest Engine** - Historical data backtesting with performance metrics calculation
+- ✅ **Config Manager** - Zero-modification deployment to any US stock (SPXL, SOXL, AAPL, Options)
+- ✅ **Enhanced Monitoring** - Error tracking, performance monitoring, and system health dashboard
+- ✅ **14 Test Files** - Comprehensive unit tests with 80%+ coverage target
 
 ### 📈 Market Expansion
 - ✅ **A-Share Market Support** - Extended our trading capabilities to include Chinese A-share markets, expanding our global market coverage.
@@ -57,6 +63,8 @@
 - ✅ **Agent Reasoning Display** - Implemented complete transparency into AI decision-making processes, featuring detailed reasoning chains that show how each trading decision is formed.
 
 - ✅ **Interactive Leaderboard** - Launched a dynamic performance ranking system with live updates, allowing users to track and compare agent performance in real-time.
+
+- ✅ **FastAPI Web Dashboard** - Modern dark-theme dashboard at http://localhost:8888 with real-time metrics, equity curve, positions, trades, and performance targets visualization.
 
 - ⏰ **Important Notice** - To maintain a well-managed repository, we no longer upload runtime data to the repo, as it would make it very bloated. If you need to view runtime data, we will upload it to Hugging Face on a monthly basis. You can view real-time runtime data here: https://ai4trade.ai.
 ---
@@ -262,11 +270,28 @@ AI-Trader Bench/
 │   │   ├── Dockerfile             # Container build
 │   │   ├── docker-compose.yml     # Stack: Trader + Prometheus + Grafana
 │   │   └── prometheus.yml         # Prometheus config
-│   └── tests/                     # 🧪 Unit & integration tests
+│   └── tests/                     # 🧪 Unit & integration tests (14 files)
 │       ├── test_trade_executor.py
 │       ├── test_risk_control.py
 │       ├── test_session_manager.py
+│       ├── test_backtest.py       # 🆕 Backtest engine tests
+│       ├── test_config_manager.py # 🆕 Config manager tests
 │       └── test_integration.py
+│
+├── 📊 Backtest System             # 🆕 Historical data backtesting
+│   └── backtest/
+│       ├── backtest_engine.py     # 🔄 Backtest engine with metrics
+│       └── __init__.py
+│
+├── 🌐 Web Dashboard               # 🆕 FastAPI real-time dashboard
+│   └── web/
+│       ├── dashboard.py           # 📊 WebSocket-powered UI
+│       └── __init__.py
+│
+├── 📄 Report Generation           # 🆕 PDF/Excel report generation
+│   └── reports/
+│       ├── report_generator.py    # 📋 Multi-format reports
+│       └── __init__.py
 │
 ├── 💬 Prompt System
 │   └── prompts/
@@ -279,17 +304,19 @@ AI-Trader Bench/
 ├── 📋 Configuration & Documentation
 │   ├── configs/                   # ⚙️ System configuration
 │   │   ├── default_config.json    # US stocks default configuration
-│   │   └── astock_config.json     # A-share configuration example
+│   │   ├── astock_config.json     # A-share configuration example
+│   │   ├── config_manager.py      # 🆕 Zero-deploy config system
+│   │   └── hft_*.json             # 🆕 Pre-built HFT configs (TQQQ, SPXL, SOXL, AAPL, Options)
 │   └── calc_perf.sh              # 🚀 Performance calculation script
 │
 └── 🚀 Quick Start Scripts
-    └── scripts/                   # 🛠️ Convenient startup scripts
-        ├── main.sh                # One-click complete workflow (US stocks)
-        ├── main_step1.sh          # US stocks: Data preparation
-        ├── main_step2.sh          # US stocks: Start MCP services
-        ├── main_step3.sh          # US stocks: Run trading agent
-        ├── main_a_stock_step1.sh  # A-shares: Data preparation
-        ├── main_a_stock_step2.sh  # A-shares: Start MCP services
+    └── scripts/                   # 🛠️ Convenient startup scripts (.sh + .bat)
+        ├── main.sh/.bat           # One-click complete workflow (US stocks)
+        ├── main_step1.sh/.bat     # US stocks: Data preparation
+        ├── main_step2.sh/.bat     # US stocks: Start MCP services
+        ├── main_step3.sh/.bat     # US stocks: Run trading agent
+        ├── main_a_stock_step1.sh/.bat  # A-shares: Data preparation
+        ├── main_a_stock_step2.sh/.bat  # A-shares: Start MCP services
         ├── main_a_stock_step3.sh  # A-shares: Run trading agent
         ├── main_crypto_step1.sh   # Crypto: Data preparation
         ├── main_crypto_step2.sh   # Crypto: Start MCP services
