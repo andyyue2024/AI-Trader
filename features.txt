@@ -25,13 +25,13 @@ Grafana 仪表盘配置 ✅ 已完成 - docker/grafana/provisioning/dashboards/a
 零改动部署到任意美股标的 ✅ 已完成
 预定义配置模板（TQQQ/QQQ, SPXL, SOXL, AAPL, Options）✅ 已完成
 环境变量覆盖支持 ✅ 已完成
-1.6 其他
-📊 Post-Market Statistics - Automatic profit analysis
-🔌 Strategy Marketplace - Add third-party strategy sharing platform
-🎨 Cool Frontend Interface - Modern web dashboard
-📈 More Strategies - Technical analysis, quantitative strategies
-⏰ Advanced Replay - Support minute-level time precision and real-time replay
-🔍 Smart Filtering - More precise future information detection and filtering
+1.6 其他功能
+📊 Post-Market Statistics - Automatic profit analysis ✅ 已完成 - reports/post_market_stats.py
+🔌 Strategy Marketplace - Add third-party strategy sharing platform ✅ 已完成 - strategies/strategy_marketplace.py
+🎨 Cool Frontend Interface - Modern web dashboard ✅ 已完成 - web/dashboard.py
+📈 More Strategies - Technical analysis, quantitative strategies ✅ 已完成 - strategies/technical_strategies.py
+⏰ Advanced Replay - Support minute-level time precision and real-time replay ✅ 已完成 - backtest/advanced_replay.py
+🔍 Smart Filtering - More precise future information detection and filtering ✅ 已完成 - backtest/smart_filter.py
 
 二、待办事项
 2.1 OpenD 运行环境选择
