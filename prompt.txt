@@ -1,5 +1,5 @@
 总体目标：用富途 OpenD+任意语言（Python/Java/C#/C++/JS）把 Al-Trader 改到 0.0014s 下单，先跑通 TQQQ/QQQ，再秒级复制到美股全品类。
-已当前项目为起点。
+
 具体要求(你要做的事)：
 1.
 基于 OpenD（Win/Mac/Linux）用你擅长的语言重写动作层：long/short/flat，滑点≤0.2%。

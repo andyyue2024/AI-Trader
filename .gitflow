@@ -1,0 +1,15 @@
+# AI-Trader Git Flow 工作流配置
+
+# 默认分支配置
+[gitflow "branch"]
+    master = main
+    develop = develop
+
+# 前缀配置
+[gitflow "prefix"]
+    feature = feature/
+    bugfix = bugfix/
+    release = release/
+    hotfix = hotfix/
+    support = support/
+    versiontag = v

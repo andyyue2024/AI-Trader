@@ -488,7 +488,7 @@ class HighFrequencyTrader:
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """获取性能统计"""
-        return {
+        stats = {
             "loop_times": {
                 "count": len(self._loop_times),
                 "avg_ms": sum(self._loop_times) / max(1, len(self._loop_times)),
@@ -508,6 +508,23 @@ class HighFrequencyTrader:
             "execution_metrics": self._executor.get_execution_metrics() if self._executor else {},
             "risk_status": self._risk_manager.get_status() if self._risk_manager else {}
         }
+
+        # 添加绩效分析指标
+        if hasattr(self, '_performance_analyzer') and self._performance_analyzer:
+            perf_metrics = self._performance_analyzer.get_performance_metrics()
+            stats["performance"] = perf_metrics.to_dict()
+            stats["targets_met"] = perf_metrics.meets_targets(
+                target_sharpe=2.0,
+                target_max_dd=0.15,
+                target_daily_volume=50000,
+                target_fill_rate=0.95
+            )
+
+        # 添加时段信息
+        if hasattr(self, '_session_manager') and self._session_manager:
+            stats["session"] = self._session_manager.get_status()
+
+        return stats
 
 
 async def main():
