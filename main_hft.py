@@ -190,7 +190,24 @@ class HighFrequencyTrader:
 
         logger.info("✅ Monitoring ready")
 
-        # 6. 设置风控回调
+        # 6. 初始化绩效分析器
+        logger.info("📊 Initializing performance analyzer...")
+        from risk_control.performance_analyzer import PerformanceAnalyzer
+        self._performance_analyzer = PerformanceAnalyzer(
+            initial_equity=self.config["trading"]["initial_cash"]
+        )
+        logger.info("✅ Performance analyzer ready")
+
+        # 7. 初始化时段管理器
+        logger.info("⏰ Initializing session manager...")
+        from futu.session_manager import SessionManager, MarketType
+        self._session_manager = SessionManager(MarketType.US_STOCK)
+        session_status = self._session_manager.get_status()
+        logger.info(f"   Current session: {session_status['current_session']}")
+        logger.info(f"   Can trade: {session_status['can_trade']}")
+        logger.info("✅ Session manager ready")
+
+        # 8. 设置风控回调
         self._setup_risk_callbacks()
 
         logger.info("=" * 60)
@@ -243,37 +260,23 @@ class HighFrequencyTrader:
         """
         start = time.perf_counter()
 
-        # 简化的决策逻辑（实际使用时替换为 AI 模型）
-        # 这里使用简单的动量策略作为示例
         klines = market_data.get("klines", [])
 
         if len(klines) < 5:
             return {"action": "hold", "reason": "Insufficient data"}
 
-        # 计算短期动量
-        recent_closes = [k["close"] for k in klines[-5:]]
-        momentum = (recent_closes[-1] - recent_closes[0]) / recent_closes[0]
-
-        decision = {"action": "hold", "quantity": 0, "reason": ""}
-
-        if momentum > 0.005:  # 上涨超过0.5%
-            decision = {
-                "action": "long",
-                "quantity": 10,
-                "reason": f"Positive momentum: {momentum:.2%}"
-            }
-        elif momentum < -0.005:  # 下跌超过0.5%
-            decision = {
-                "action": "short",
-                "quantity": 10,
-                "reason": f"Negative momentum: {momentum:.2%}"
-            }
+        # 使用策略模块进行决策
+        if hasattr(self, '_strategy') and self._strategy:
+            signal = self._strategy.analyze(market_data)
+            decision = signal.to_dict()
         else:
-            decision = {
-                "action": "hold",
-                "quantity": 0,
-                "reason": f"Neutral momentum: {momentum:.2%}"
-            }
+            # 默认使用组合策略
+            from futu.strategies import CompositeStrategy
+            if not hasattr(self, '_default_strategy'):
+                self._default_strategy = CompositeStrategy(position_size=10)
+
+            signal = self._default_strategy.analyze(market_data)
+            decision = signal.to_dict()
 
         decision_time = (time.perf_counter() - start) * 1000
         self._decision_times.append(decision_time)
@@ -334,6 +337,14 @@ class HighFrequencyTrader:
                     order_id=result.order_id
                 )
 
+                # 记录到绩效分析器
+                if hasattr(self, '_performance_analyzer') and self._performance_analyzer:
+                    self._performance_analyzer.record_order(
+                        submitted=True,
+                        filled=True,
+                        slippage=result.slippage if hasattr(result, 'slippage') else 0.0
+                    )
+
             return result.to_dict()
 
         except Exception as e:
@@ -354,12 +365,35 @@ class HighFrequencyTrader:
                     await asyncio.sleep(60)
                     continue
 
-                # 检查交易时段
-                session = self._subscriber.get_current_session()
-                if session.value == "closed":
-                    logger.info("Market closed, waiting...")
-                    await asyncio.sleep(60)
-                    continue
+                # 使用时段管理器检查交易时段
+                if hasattr(self, '_session_manager') and self._session_manager:
+                    current_session = self._session_manager.get_current_session()
+                    can_trade = self._session_manager.can_trade()
+
+                    if not can_trade:
+                        next_session, time_to_next = self._session_manager.get_time_to_next_session()
+                        wait_seconds = min(60, time_to_next.total_seconds())
+                        logger.info(f"Market {current_session.value}, next: {next_session.value} in {time_to_next}")
+                        await asyncio.sleep(wait_seconds)
+                        continue
+
+                    # 检查盘前/盘后是否启用
+                    if current_session.value == "pre_market" and not self.config["trading"]["enable_premarket"]:
+                        logger.info("Pre-market trading disabled, waiting...")
+                        await asyncio.sleep(60)
+                        continue
+
+                    if current_session.value == "after_hours" and not self.config["trading"]["enable_afterhours"]:
+                        logger.info("After-hours trading disabled, waiting...")
+                        await asyncio.sleep(60)
+                        continue
+                else:
+                    # 降级：使用订阅器检查
+                    session = self._subscriber.get_current_session()
+                    if session.value == "closed":
+                        logger.info("Market closed, waiting...")
+                        await asyncio.sleep(60)
+                        continue
 
                 # 遍历所有标的
                 for symbol in self.symbols:

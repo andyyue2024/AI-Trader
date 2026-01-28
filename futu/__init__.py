@@ -10,6 +10,10 @@ from .trade_executor import FutuTradeExecutor, OrderType, OrderSide
 from .quote_subscriber import FutuQuoteSubscriber
 from .session_manager import SessionManager, MarketSession, MarketType, is_market_open, get_current_session
 from .options_trader import OptionTrader, OptionContract, OptionType, OptionChain
+from .strategies import (
+    BaseStrategy, Signal, get_strategy,
+    MomentumStrategy, MeanReversionStrategy, RSIStrategy, MACDStrategy, CompositeStrategy
+)
 
 __all__ = [
     # 连接管理
@@ -31,5 +35,14 @@ __all__ = [
     'OptionTrader',
     'OptionContract',
     'OptionType',
-    'OptionChain'
+    'OptionChain',
+    # 策略
+    'BaseStrategy',
+    'Signal',
+    'get_strategy',
+    'MomentumStrategy',
+    'MeanReversionStrategy',
+    'RSIStrategy',
+    'MACDStrategy',
+    'CompositeStrategy'
 ]

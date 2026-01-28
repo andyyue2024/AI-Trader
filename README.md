@@ -34,6 +34,16 @@
 ---
 ## 🎉 Weekly Update
 
+### ⚡ High Frequency Trading System (NEW!)
+- ✅ **Futu OpenD Integration** - Added support for Futu OpenD API enabling ultra-low latency trading with ≤0.0014s order execution
+- ✅ **HFT Main Program** - New `main_hft.py` implementing complete high-frequency trading loop: 1min quote → AI decision → order ≤ 1s
+- ✅ **Advanced Risk Control** - Circuit breaker (3% daily loss auto-halt), drawdown monitor (≤15%), slippage checker (≤0.2%)
+- ✅ **Performance Analyzer** - Real-time calculation of Sharpe ratio (target ≥2), fill rate (target ≥95%), daily volume (target ≥$50k)
+- ✅ **Session Manager** - Seamless trading across pre-market, regular hours, and after-hours sessions
+- ✅ **Options Trading Support** - Full options trading with strategies: straddle, strangle, bull/bear spreads
+- ✅ **Docker Deployment** - Complete containerization with Prometheus + Grafana monitoring stack
+- ✅ **Feishu Alerts** - 5-minute exception notification via Feishu webhook
+
 ### 📈 Market Expansion
 - ✅ **A-Share Market Support** - Extended our trading capabilities to include Chinese A-share markets, expanding our global market coverage.
 - ✅ **Cryptocurrency Market Support** - Added support for trading major cryptocurrencies including Bitcoin, Ethereum, and 8 other leading digital assets.
@@ -229,6 +239,34 @@ AI-Trader Bench/
 │   │   ├── agent_data_astock/     # 📝 A-share AI trading records
 │   │   └── agent_data_crypto/     # 📝 Cryptocurrency AI trading records
 │   └── calculate_performance.py   # 📈 Performance analysis
+│
+├── ⚡ High Frequency Trading System
+│   ├── main_hft.py                # 🚀 HFT main program entry
+│   ├── futu/                      # 📡 Futu OpenD trading module
+│   │   ├── opend_client.py        # 🔌 OpenD connection pool
+│   │   ├── trade_executor.py      # 💹 Trade executor (long/short/flat)
+│   │   ├── quote_subscriber.py    # 📊 Real-time quote subscriber
+│   │   ├── session_manager.py     # ⏰ Trading session manager
+│   │   └── options_trader.py      # 📈 Options trading support
+│   ├── risk_control/              # 🛡️ Risk control module
+│   │   ├── circuit_breaker.py     # ⚡ 3% daily loss circuit breaker
+│   │   ├── drawdown_monitor.py    # 📉 Max drawdown ≤15% monitor
+│   │   ├── slippage_checker.py    # 📏 Slippage ≤0.2% checker
+│   │   ├── risk_manager.py        # 🎯 Comprehensive risk manager
+│   │   └── performance_analyzer.py # 📊 Sharpe/fill rate/volume analyzer
+│   ├── monitoring/                # 📈 Monitoring & alerting
+│   │   ├── metrics_exporter.py    # 📤 Prometheus metrics exporter
+│   │   ├── feishu_alert.py        # 💬 Feishu 5-min alert
+│   │   └── grafana_dashboard.py   # 📊 Grafana dashboard config
+│   ├── docker/                    # 🐳 Docker deployment
+│   │   ├── Dockerfile             # Container build
+│   │   ├── docker-compose.yml     # Stack: Trader + Prometheus + Grafana
+│   │   └── prometheus.yml         # Prometheus config
+│   └── tests/                     # 🧪 Unit & integration tests
+│       ├── test_trade_executor.py
+│       ├── test_risk_control.py
+│       ├── test_session_manager.py
+│       └── test_integration.py
 │
 ├── 💬 Prompt System
 │   └── prompts/
@@ -503,6 +541,47 @@ python main.py configs/astock_config.json
 # 🎯 Run cryptocurrency trading
 python main.py configs/default_crypto_config.json
 ```
+
+#### ⚡ For High Frequency Trading (HFT):
+```bash
+# 🚀 Prerequisites: Install HFT dependencies
+pip install futu-api aiohttp pytz prometheus-client
+
+# 🔧 Start Futu OpenD (download from https://www.futunn.com/download/openAPI)
+# Configure your OpenD with trading password
+
+# 📝 Configure environment variables
+export OPEND_HOST=127.0.0.1
+export OPEND_PORT=11111
+export OPEND_TRD_ENV=1  # 1=Simulation, 0=Live
+export FEISHU_WEBHOOK_URL=your_webhook_url  # Optional
+
+# 🎯 Run HFT in simulation mode (TQQQ/QQQ)
+python main_hft.py --symbols TQQQ QQQ --dry-run
+
+# 🎯 Run HFT with custom symbols
+python main_hft.py --symbols SPXL SOXL AAPL --dry-run
+
+# 🎯 Run HFT with custom config
+python main_hft.py --config configs/hft_config.json --dry-run
+
+# 🐳 Docker deployment
+cd docker
+docker-compose up -d
+# Access Grafana: http://localhost:3000 (admin/admin123)
+# Access Prometheus: http://localhost:9091
+```
+
+**HFT Performance Targets:**
+| Metric | Target | Description |
+|--------|--------|-------------|
+| Order Latency | ≤ 0.0014s | Ultra-fast order execution |
+| Full Loop | ≤ 1s | Quote → Decision → Order |
+| Slippage | ≤ 0.2% | Execution price deviation |
+| Sharpe Ratio | ≥ 2.0 | Risk-adjusted returns |
+| Max Drawdown | ≤ 15% | Capital protection |
+| Daily Volume | ≥ $50,000 | Trading activity |
+| Fill Rate | ≥ 95% | Order completion rate |
 
 ### ⏰ Time Settings Example
 
@@ -885,6 +964,68 @@ The materials provided by the AI-Trader project are for research purposes only a
 **🛠️ Pure tool-driven execution with zero human intervention—a genuine AI trading arena!** 🚀
 
 </div>
+
+---
+
+## ⚡ High Frequency Trading System
+
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AI-Trader HFT System                     │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  Quote Sub  │  │  AI Model   │  │  Executor   │         │
+│  │  (1min K)   │──│  Decision   │──│  (OpenD)    │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+│         │                │                │                 │
+│         ▼                ▼                ▼                 │
+│  ┌─────────────────────────────────────────────────┐       │
+│  │              Risk Control Layer                  │       │
+│  │  • Circuit Breaker (3% daily loss)              │       │
+│  │  • Drawdown Monitor (≤15% max)                  │       │
+│  │  • Slippage Checker (≤0.2%)                     │       │
+│  └─────────────────────────────────────────────────┘       │
+│         │                                                   │
+│         ▼                                                   │
+│  ┌─────────────────────────────────────────────────┐       │
+│  │              Monitoring & Alerting               │       │
+│  │  • Prometheus Metrics (port 9090)               │       │
+│  │  • Grafana Dashboard                            │       │
+│  │  • Feishu Alert (5-min notification)            │       │
+│  └─────────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Futu OpenD Integration** | Direct connection to Futu trading platform |
+| **Session Manager** | Pre-market, regular, after-hours seamless trading |
+| **Options Support** | Straddle, strangle, bull/bear spread strategies |
+| **Performance Analyzer** | Real-time Sharpe, Sortino, drawdown calculation |
+| **Zero-Change Deployment** | Same code for TQQQ, SPXL, SOXL, AAPL, options |
+
+### Running Tests
+
+```bash
+# Run all tests with coverage
+python run_tests.py
+
+# Quick tests (excluding integration)
+python run_tests.py --quick
+
+# Coverage analysis (target ≥80%)
+python run_tests.py --coverage
+```
+
+### Documentation
+
+- 📖 [HFT System Guide](docs/HFT_README.md) - Detailed HFT documentation
+- 🔄 [Git Flow Guide](docs/GIT_FLOW.md) - Development workflow
+- ⚙️ [HFT Configuration](configs/hft_config.json) - HFT settings
 
 ---
 
