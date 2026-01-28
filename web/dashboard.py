@@ -1,22 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-AI-Trader Web UI
-基于 FastAPI 的 Web 仪表盘界面
+AI-Trader Web UI - 优化版
+基于 FastAPI 的现代化 Web 仪表盘
 """
 
 import asyncio
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 try:
-    from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+    from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-    from fastapi.staticfiles import StaticFiles
     import uvicorn
     FASTAPI_AVAILABLE = True
 except ImportError:
@@ -25,31 +23,14 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-# 创建 FastAPI 应用
 if FASTAPI_AVAILABLE:
-    app = FastAPI(
-        title="AI-Trader Dashboard",
-        description="High Frequency Trading System Dashboard",
-        version="1.0.0"
-    )
-
-    # CORS 配置
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    app = FastAPI(title="AI-Trader Dashboard", version="2.0.0")
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 else:
     app = None
 
 
-# WebSocket 连接管理
 class ConnectionManager:
-    """WebSocket 连接管理器"""
-
     def __init__(self):
         self.active_connections: List[WebSocket] = []
 
@@ -62,556 +43,266 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
-        """广播消息到所有连接"""
-        for connection in self.active_connections:
+        for conn in self.active_connections:
             try:
-                await connection.send_json(message)
-            except Exception:
+                await conn.send_json(message)
+            except:
                 pass
 
 
 manager = ConnectionManager()
 
 
-# 全局状态存储
 class DashboardState:
-    """仪表盘状态"""
-
     def __init__(self):
-        self.trader = None
         self.is_running = False
-        self.symbols = []
+        self.symbols = ["TQQQ", "QQQ"]
         self.last_update = None
         self.trades_history = []
         self.alerts = []
+        self.positions = []
+        self.metrics = {"total_equity": 50000.0, "daily_pnl": 0.0, "daily_return": 0.0, "sharpe_ratio": 0.0, "max_drawdown": 0.0, "fill_rate": 0.0, "avg_slippage": 0.0, "daily_volume": 0.0, "total_trades": 0, "win_rate": 0.0, "order_latency": 0.0, "loop_time": 0.0}
 
-    def update(self, data: Dict[str, Any]):
-        self.last_update = datetime.now()
-        for key, value in data.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "is_running": self.is_running,
-            "symbols": self.symbols,
-            "last_update": self.last_update.isoformat() if self.last_update else None,
-            "trades_count": len(self.trades_history),
-            "alerts_count": len(self.alerts)
-        }
+    def to_dict(self):
+        return {"is_running": self.is_running, "symbols": self.symbols, "last_update": self.last_update.isoformat() if self.last_update else None}
 
 
 dashboard_state = DashboardState()
 
-
-# HTML 模板
-DASHBOARD_HTML = """
-<!DOCTYPE html>
-<html lang="en">
+DASHBOARD_HTML = '''<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI-Trader Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .card { @apply bg-white rounded-lg shadow-lg p-6; }
-        .stat-value { @apply text-3xl font-bold text-gray-800; }
-        .stat-label { @apply text-sm text-gray-500; }
-        .status-running { @apply bg-green-500; }
-        .status-stopped { @apply bg-red-500; }
-        .alert-critical { @apply bg-red-100 border-red-500 text-red-700; }
-        .alert-warning { @apply bg-yellow-100 border-yellow-500 text-yellow-700; }
-        .alert-info { @apply bg-blue-100 border-blue-500 text-blue-700; }
-    </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-Trader Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--text:#f8fafc;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--blue:#3b82f6}
+*{font-family:'Inter',system-ui,sans-serif}body{background:var(--bg);color:var(--text);margin:0}
+.card{background:var(--card);border-radius:12px;border:1px solid rgba(148,163,184,0.1)}
+.pulse{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.btn{padding:8px 16px;border-radius:8px;font-weight:500;transition:all 0.2s}
+.btn-green{background:linear-gradient(135deg,#22c55e,#16a34a)}.btn-red{background:linear-gradient(135deg,#ef4444,#dc2626)}
+.btn-blue{background:linear-gradient(135deg,#3b82f6,#2563eb)}
+.progress{height:6px;background:rgba(148,163,184,0.2);border-radius:3px;overflow:hidden}
+.progress-bar{height:100%;transition:width 0.5s}
+.target-ok{color:var(--green)}.target-miss{color:var(--red)}
+</style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <nav class="bg-gray-800 text-white p-4">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold">🚀 AI-Trader Dashboard</h1>
-            <div class="flex items-center space-x-4">
-                <span id="status-badge" class="px-3 py-1 rounded-full text-sm status-stopped">Stopped</span>
-                <span id="last-update" class="text-sm text-gray-300">--</span>
-            </div>
-        </div>
-    </nav>
+<body>
+<nav class="card mx-4 mt-4 px-6 py-4 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="text-2xl">🚀</span>
+<div><h1 class="text-xl font-bold">AI-Trader</h1><p class="text-xs text-gray-400">High Frequency Trading</p></div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2"><div id="status-dot" class="w-2 h-2 rounded-full bg-red-500 pulse"></div><span id="status-text" class="text-sm">Offline</span></div>
+<span id="clock" class="text-sm text-gray-400">--:--:--</span>
+<span id="session" class="text-xs px-2 py-1 rounded bg-gray-700">--</span>
+</div>
+</nav>
 
-    <main class="container mx-auto p-6">
-        <!-- 统计卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <div class="card">
-                <div class="stat-label">Total Equity</div>
-                <div class="stat-value" id="total-equity">$0.00</div>
-                <div class="text-sm text-green-500" id="daily-return">+0.00%</div>
-            </div>
-            <div class="card">
-                <div class="stat-label">Today's P&L</div>
-                <div class="stat-value" id="daily-pnl">$0.00</div>
-                <div class="text-sm text-gray-500" id="trade-count">0 trades</div>
-            </div>
-            <div class="card">
-                <div class="stat-label">Sharpe Ratio</div>
-                <div class="stat-value" id="sharpe-ratio">0.00</div>
-                <div class="text-sm" id="sharpe-target">Target: ≥2.0</div>
-            </div>
-            <div class="card">
-                <div class="stat-label">Max Drawdown</div>
-                <div class="stat-value" id="max-drawdown">0.00%</div>
-                <div class="text-sm" id="drawdown-target">Target: ≤15%</div>
-            </div>
-        </div>
+<main class="p-4 space-y-4">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+<div class="card p-4"><div class="text-xs text-gray-400">Equity</div><div class="text-2xl font-bold" id="equity">$50,000</div><div class="text-xs" id="equity-chg"><span class="text-green-400">+$0</span></div></div>
+<div class="card p-4"><div class="text-xs text-gray-400">Today P&L</div><div class="text-2xl font-bold" id="pnl">$0</div><div class="text-xs text-gray-500" id="trades">0 trades</div></div>
+<div class="card p-4"><div class="text-xs text-gray-400">Sharpe</div><div class="text-2xl font-bold" id="sharpe">0.00</div><div class="text-xs"><span id="sharpe-s" class="target-miss">Target: ≥2</span></div></div>
+<div class="card p-4"><div class="text-xs text-gray-400">Drawdown</div><div class="text-2xl font-bold" id="dd">0%</div><div class="text-xs"><span id="dd-s" class="target-ok">Target: ≤15%</span></div></div>
+<div class="card p-4"><div class="text-xs text-gray-400">Fill Rate</div><div class="text-2xl font-bold" id="fill">0%</div><div class="progress mt-2"><div id="fill-bar" class="progress-bar bg-blue-500" style="width:0"></div></div></div>
+<div class="card p-4"><div class="text-xs text-gray-400">Volume</div><div class="text-2xl font-bold" id="vol">$0</div><div class="text-xs"><span id="vol-s" class="target-miss">Target: ≥$50k</span></div></div>
+</div>
 
-        <!-- 性能指标 -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div class="card">
-                <div class="stat-label">Fill Rate</div>
-                <div class="stat-value" id="fill-rate">0.00%</div>
-                <div class="text-sm" id="fill-target">Target: ≥95%</div>
-            </div>
-            <div class="card">
-                <div class="stat-label">Avg Slippage</div>
-                <div class="stat-value" id="avg-slippage">0.00%</div>
-                <div class="text-sm" id="slippage-target">Target: ≤0.2%</div>
-            </div>
-            <div class="card">
-                <div class="stat-label">Daily Volume</div>
-                <div class="stat-value" id="daily-volume">$0</div>
-                <div class="text-sm" id="volume-target">Target: ≥$50k</div>
-            </div>
-        </div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+<div class="lg:col-span-2 space-y-4">
+<div class="card p-4"><div class="flex justify-between mb-3"><h3 class="font-semibold">Equity Curve</h3><div class="flex gap-1 text-xs"><button class="px-2 py-1 rounded bg-gray-700">1H</button><button class="px-2 py-1 rounded bg-blue-600">1D</button><button class="px-2 py-1 rounded bg-gray-700">1W</button></div></div><div style="height:220px"><canvas id="chart-equity"></canvas></div></div>
+<div class="grid grid-cols-2 gap-4">
+<div class="card p-4"><h3 class="font-semibold mb-3">P&L Distribution</h3><div style="height:160px"><canvas id="chart-pnl"></canvas></div></div>
+<div class="card p-4"><h3 class="font-semibold mb-3">Latency</h3><div style="height:160px"><canvas id="chart-lat"></canvas></div></div>
+</div>
+</div>
 
-        <!-- 图表区域 -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-4">Equity Curve</h3>
-                <canvas id="equity-chart" height="200"></canvas>
-            </div>
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-4">P&L Distribution</h3>
-                <canvas id="pnl-chart" height="200"></canvas>
-            </div>
-        </div>
+<div class="space-y-4">
+<div class="card p-4"><div class="flex justify-between mb-3"><h3 class="font-semibold">Positions</h3><span class="text-xs text-gray-400" id="pos-cnt">0</span></div><div id="positions" class="space-y-2 max-h-40 overflow-auto"><div class="text-center text-gray-500 py-6 text-sm">No positions</div></div></div>
+<div class="card p-4"><div class="flex justify-between mb-3"><h3 class="font-semibold">Trades</h3><span class="text-xs text-blue-400 cursor-pointer">View All</span></div><div id="trade-list" class="space-y-2 max-h-52 overflow-auto"><div class="text-center text-gray-500 py-6 text-sm">No trades</div></div></div>
+<div class="card p-4"><div class="flex justify-between mb-3"><h3 class="font-semibold">Alerts</h3><span class="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400" id="alert-cnt">0</span></div><div id="alerts" class="space-y-2 max-h-32 overflow-auto"><div class="text-center text-gray-500 py-4 text-sm">No alerts</div></div></div>
+</div>
+</div>
 
-        <!-- 持仓和交易 -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-4">Current Positions</h3>
-                <table class="w-full">
-                    <thead>
-                        <tr class="text-left text-gray-500 text-sm">
-                            <th class="pb-2">Symbol</th>
-                            <th class="pb-2">Qty</th>
-                            <th class="pb-2">Avg Cost</th>
-                            <th class="pb-2">P&L</th>
-                        </tr>
-                    </thead>
-                    <tbody id="positions-table">
-                        <tr><td colspan="4" class="text-center text-gray-400 py-4">No positions</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="card">
-                <h3 class="text-lg font-semibold mb-4">Recent Trades</h3>
-                <div id="trades-list" class="space-y-2 max-h-64 overflow-y-auto">
-                    <div class="text-center text-gray-400 py-4">No trades yet</div>
-                </div>
-            </div>
-        </div>
+<div class="card p-4 flex flex-wrap justify-between items-center gap-4">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2"><span class="text-sm text-gray-400">Symbols:</span><input id="sym" value="TQQQ,QQQ" class="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-sm w-32"></div>
+<div class="flex items-center gap-2"><span class="text-sm text-gray-400">Mode:</span><select id="mode" class="bg-gray-800 border border-gray-700 rounded px-3 py-1 text-sm"><option value="dry">Dry Run</option><option value="live">Live</option></select></div>
+</div>
+<div class="flex gap-2">
+<button onclick="start()" class="btn btn-green">▶ Start</button>
+<button onclick="stop()" class="btn btn-red">⏹ Stop</button>
+<button onclick="report()" class="btn btn-blue">📊 Report</button>
+</div>
+</div>
 
-        <!-- 告警区域 -->
-        <div class="card mb-6">
-            <h3 class="text-lg font-semibold mb-4">Alerts</h3>
-            <div id="alerts-list" class="space-y-2">
-                <div class="text-center text-gray-400 py-4">No alerts</div>
-            </div>
-        </div>
+<div class="card p-4"><h3 class="font-semibold mb-3">Performance Targets</h3>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+<div class="bg-gray-800/50 rounded-lg p-3"><div class="flex justify-between mb-1"><span class="text-xs text-gray-400">Order Latency</span><span id="lat-s" class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">OK</span></div><div class="text-lg font-bold" id="lat">0.0ms</div><div class="text-xs text-gray-500">Target: ≤1.4ms</div></div>
+<div class="bg-gray-800/50 rounded-lg p-3"><div class="flex justify-between mb-1"><span class="text-xs text-gray-400">Loop Time</span><span id="loop-s" class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">OK</span></div><div class="text-lg font-bold" id="loop">0ms</div><div class="text-xs text-gray-500">Target: ≤1000ms</div></div>
+<div class="bg-gray-800/50 rounded-lg p-3"><div class="flex justify-between mb-1"><span class="text-xs text-gray-400">Slippage</span><span id="slip-s" class="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">OK</span></div><div class="text-lg font-bold" id="slip">0.00%</div><div class="text-xs text-gray-500">Target: ≤0.2%</div></div>
+<div class="bg-gray-800/50 rounded-lg p-3"><div class="flex justify-between mb-1"><span class="text-xs text-gray-400">Win Rate</span><span id="wr-s" class="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">--</span></div><div class="text-lg font-bold" id="wr">0%</div><div class="text-xs text-gray-500">Target: ≥50%</div></div>
+</div>
+</div>
+</main>
 
-        <!-- 控制面板 -->
-        <div class="card">
-            <h3 class="text-lg font-semibold mb-4">Control Panel</h3>
-            <div class="flex space-x-4">
-                <button id="btn-start" onclick="startTrading()" 
-                    class="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600">
-                    Start Trading
-                </button>
-                <button id="btn-stop" onclick="stopTrading()" 
-                    class="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600">
-                    Stop Trading
-                </button>
-                <button onclick="generateReport()" 
-                    class="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
-                    Generate Report
-                </button>
-                <button onclick="location.reload()" 
-                    class="px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-                    Refresh
-                </button>
-            </div>
-        </div>
-    </main>
+<script>
+let ws,eqChart,pnlChart,latChart;
+const $=id=>document.getElementById(id);
 
-    <script>
-        let ws;
-        let equityChart, pnlChart;
+function init(){
+initCharts();initWS();setInterval(()=>$('clock').textContent=new Date().toLocaleTimeString(),1000);
+fetch('/api/status').then(r=>r.json()).then(update).catch(()=>{});
+}
 
-        // 初始化 WebSocket
-        function initWebSocket() {
-            const wsUrl = `ws://${window.location.host}/ws`;
-            ws = new WebSocket(wsUrl);
-            
-            ws.onopen = () => console.log('WebSocket connected');
-            ws.onclose = () => setTimeout(initWebSocket, 3000);
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                updateDashboard(data);
-            };
-        }
+function initWS(){
+ws=new WebSocket(`ws://${location.host}/ws`);
+ws.onopen=()=>{$('status-dot').className='w-2 h-2 rounded-full bg-green-500 pulse';$('status-text').textContent='Online'};
+ws.onclose=()=>{$('status-dot').className='w-2 h-2 rounded-full bg-red-500 pulse';$('status-text').textContent='Offline';setTimeout(initWS,3000)};
+ws.onmessage=e=>update(JSON.parse(e.data));
+}
 
-        // 更新仪表盘
-        function updateDashboard(data) {
-            if (data.status) {
-                const badge = document.getElementById('status-badge');
-                badge.textContent = data.status.is_running ? 'Running' : 'Stopped';
-                badge.className = data.status.is_running ? 
-                    'px-3 py-1 rounded-full text-sm status-running' : 
-                    'px-3 py-1 rounded-full text-sm status-stopped';
-            }
-            
-            if (data.metrics) {
-                updateMetrics(data.metrics);
-            }
-            
-            if (data.positions) {
-                updatePositions(data.positions);
-            }
-            
-            if (data.trades) {
-                updateTrades(data.trades);
-            }
-            
-            if (data.alerts) {
-                updateAlerts(data.alerts);
-            }
-            
-            document.getElementById('last-update').textContent = 
-                'Updated: ' + new Date().toLocaleTimeString();
-        }
+function initCharts(){
+const opts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(148,163,184,0.1)'},ticks:{color:'#94a3b8'}},y:{grid:{color:'rgba(148,163,184,0.1)'},ticks:{color:'#94a3b8'}}}};
+eqChart=new Chart($('chart-equity'),{type:'line',data:{labels:[],datasets:[{data:[],borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.4,pointRadius:0}]},options:opts});
+pnlChart=new Chart($('chart-pnl'),{type:'bar',data:{labels:[],datasets:[{data:[],backgroundColor:[]}]},options:opts});
+latChart=new Chart($('chart-lat'),{type:'line',data:{labels:[],datasets:[{label:'Loop',data:[],borderColor:'#3b82f6',tension:0.4,pointRadius:0},{label:'Order',data:[],borderColor:'#22c55e',tension:0.4,pointRadius:0}]},options:{...opts,plugins:{legend:{display:true,labels:{color:'#94a3b8'}}}}});
+}
 
-        function updateMetrics(m) {
-            document.getElementById('total-equity').textContent = '$' + (m.total_equity || 0).toLocaleString();
-            document.getElementById('daily-return').textContent = ((m.daily_return || 0) * 100).toFixed(2) + '%';
-            document.getElementById('daily-pnl').textContent = '$' + (m.daily_pnl || 0).toFixed(2);
-            document.getElementById('trade-count').textContent = (m.total_trades || 0) + ' trades';
-            document.getElementById('sharpe-ratio').textContent = (m.sharpe_ratio || 0).toFixed(2);
-            document.getElementById('max-drawdown').textContent = ((m.max_drawdown || 0) * 100).toFixed(2) + '%';
-            document.getElementById('fill-rate').textContent = ((m.fill_rate || 0) * 100).toFixed(2) + '%';
-            document.getElementById('avg-slippage').textContent = ((m.avg_slippage || 0) * 100).toFixed(4) + '%';
-            document.getElementById('daily-volume').textContent = '$' + (m.daily_volume || 0).toLocaleString();
-        }
+function update(d){
+if(d.metrics)updateMetrics(d.metrics);
+if(d.positions)updatePositions(d.positions);
+if(d.trades)updateTrades(d.trades);
+if(d.alerts)updateAlerts(d.alerts);
+if(d.session)$('session').textContent={'pre_market':'🌅Pre','regular':'📈Regular','after_hours':'🌙After','closed':'🔒Closed'}[d.session.current_session]||'--';
+}
 
-        function updatePositions(positions) {
-            const tbody = document.getElementById('positions-table');
-            if (!positions || positions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-400 py-4">No positions</td></tr>';
-                return;
-            }
-            tbody.innerHTML = positions.map(p => `
-                <tr class="border-b">
-                    <td class="py-2 font-medium">${p.symbol}</td>
-                    <td class="py-2">${p.quantity}</td>
-                    <td class="py-2">$${p.avg_cost.toFixed(2)}</td>
-                    <td class="py-2 ${p.pnl >= 0 ? 'text-green-500' : 'text-red-500'}">
-                        ${p.pnl >= 0 ? '+' : ''}$${p.pnl.toFixed(2)}
-                    </td>
-                </tr>
-            `).join('');
-        }
+function updateMetrics(m){
+const eq=m.total_equity||50000,pnl=m.daily_pnl||0,ret=m.daily_return||0;
+$('equity').textContent='$'+eq.toLocaleString(undefined,{minimumFractionDigits:2});
+$('equity-chg').innerHTML=`<span class="${pnl>=0?'text-green-400':'text-red-400'}">${pnl>=0?'+':''}$${pnl.toFixed(2)}</span>`;
+$('pnl').textContent=(pnl>=0?'+':'')+' $'+pnl.toFixed(2);$('pnl').className='text-2xl font-bold '+(pnl>=0?'text-green-400':'text-red-400');
+$('trades').textContent=(m.total_trades||0)+' trades';
+$('sharpe').textContent=(m.sharpe_ratio||0).toFixed(2);$('sharpe-s').className=(m.sharpe_ratio||0)>=2?'target-ok':'target-miss';
+const dd=(m.max_drawdown||0)*100;$('dd').textContent=dd.toFixed(2)+'%';$('dd-s').className=dd<=15?'target-ok':'target-miss';
+const fr=(m.fill_rate||0)*100;$('fill').textContent=fr.toFixed(1)+'%';$('fill-bar').style.width=fr+'%';
+$('vol').textContent='$'+(m.daily_volume||0).toLocaleString();$('vol-s').className=(m.daily_volume||0)>=50000?'target-ok':'target-miss';
+$('lat').textContent=(m.order_latency||0).toFixed(2)+'ms';$('loop').textContent=(m.loop_time||0).toFixed(0)+'ms';
+$('slip').textContent=((m.avg_slippage||0)*100).toFixed(4)+'%';$('wr').textContent=((m.win_rate||0)*100).toFixed(1)+'%';
+setStatus('lat-s',(m.order_latency||0)<=1.4);setStatus('loop-s',(m.loop_time||0)<=1000);
+setStatus('slip-s',(m.avg_slippage||0)<=0.002);setStatus('wr-s',(m.win_rate||0)>=0.5);
+}
 
-        function updateTrades(trades) {
-            const container = document.getElementById('trades-list');
-            if (!trades || trades.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-400 py-4">No trades yet</div>';
-                return;
-            }
-            container.innerHTML = trades.slice(0, 10).map(t => `
-                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <span class="font-medium">${t.symbol}</span>
-                    <span class="${t.side === 'long' ? 'text-green-500' : 'text-red-500'}">${t.side.toUpperCase()}</span>
-                    <span>${t.quantity} @ $${t.price.toFixed(2)}</span>
-                    <span class="text-sm text-gray-500">${new Date(t.timestamp).toLocaleTimeString()}</span>
-                </div>
-            `).join('');
-        }
+function setStatus(id,ok){$(id).className='text-xs px-2 py-0.5 rounded-full '+(ok?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400');$(id).textContent=ok?'OK':'MISS'}
 
-        function updateAlerts(alerts) {
-            const container = document.getElementById('alerts-list');
-            if (!alerts || alerts.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-400 py-4">No alerts</div>';
-                return;
-            }
-            container.innerHTML = alerts.slice(0, 5).map(a => `
-                <div class="p-3 border-l-4 rounded alert-${a.level}">
-                    <div class="font-medium">${a.title}</div>
-                    <div class="text-sm">${a.content}</div>
-                    <div class="text-xs mt-1">${new Date(a.timestamp).toLocaleString()}</div>
-                </div>
-            `).join('');
-        }
+function updatePositions(p){
+$('pos-cnt').textContent=p.length+' positions';
+$('positions').innerHTML=p.length?p.map(x=>`<div class="flex justify-between items-center p-2 bg-gray-800/50 rounded"><div><span class="font-medium">${x.symbol}</span><span class="ml-2 text-xs ${x.side==='long'?'text-green-400':'text-red-400'}">${x.side.toUpperCase()}</span></div><div class="text-right"><div class="text-sm">${x.quantity}@$${(x.avg_cost||0).toFixed(2)}</div><div class="text-xs ${(x.pnl||0)>=0?'text-green-400':'text-red-400'}">${(x.pnl||0)>=0?'+':''}$${(x.pnl||0).toFixed(2)}</div></div></div>`).join(''):'<div class="text-center text-gray-500 py-6 text-sm">No positions</div>';
+}
 
-        async function startTrading() {
-            try {
-                const response = await fetch('/api/trading/start', { method: 'POST' });
-                const data = await response.json();
-                alert(data.message || 'Trading started');
-            } catch (e) {
-                alert('Failed to start trading: ' + e.message);
-            }
-        }
+function updateTrades(t){
+$('trade-list').innerHTML=t.length?t.slice(0,10).map(x=>`<div class="flex justify-between items-center p-2 rounded hover:bg-blue-500/10"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${x.side==='long'?'bg-green-400':'bg-red-400'}"></span><span class="font-medium text-sm">${x.symbol}</span></div><div class="text-xs text-gray-400">${x.quantity}@$${(x.price||0).toFixed(2)}</div><div class="text-xs ${(x.pnl||0)>=0?'text-green-400':'text-red-400'}">${(x.pnl||0)>=0?'+':''}$${(x.pnl||0).toFixed(2)}</div></div>`).join(''):'<div class="text-center text-gray-500 py-6 text-sm">No trades</div>';
+}
 
-        async function stopTrading() {
-            try {
-                const response = await fetch('/api/trading/stop', { method: 'POST' });
-                const data = await response.json();
-                alert(data.message || 'Trading stopped');
-            } catch (e) {
-                alert('Failed to stop trading: ' + e.message);
-            }
-        }
+function updateAlerts(a){
+$('alert-cnt').textContent=a.length;
+const c={critical:'border-red-500 bg-red-500/10',error:'border-red-400 bg-red-400/10',warning:'border-yellow-500 bg-yellow-500/10',info:'border-blue-500 bg-blue-500/10'};
+$('alerts').innerHTML=a.length?a.slice(0,5).map(x=>`<div class="p-2 rounded border-l-2 ${c[x.level]||c.info}"><div class="text-sm font-medium">${x.title}</div><div class="text-xs text-gray-400">${x.message}</div></div>`).join(''):'<div class="text-center text-gray-500 py-4 text-sm">No alerts</div>';
+}
 
-        async function generateReport() {
-            try {
-                window.open('/api/reports/generate?format=pdf', '_blank');
-            } catch (e) {
-                alert('Failed to generate report: ' + e.message);
-            }
-        }
+async function start(){
+const r=await fetch('/api/trading/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols:$('sym').value.split(','),dry_run:$('mode').value==='dry'})});
+const d=await r.json();notify(d.success?'Trading started':'Failed','success');
+}
+async function stop(){await fetch('/api/trading/stop',{method:'POST'});notify('Trading stopped','info')}
+function report(){window.open('/api/reports/generate?format=pdf','_blank')}
+function notify(msg,type){const d=document.createElement('div');d.className='fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 '+(type==='success'?'bg-green-500':'bg-blue-500');d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),3000)}
 
-        // 初始化图表
-        function initCharts() {
-            const equityCtx = document.getElementById('equity-chart').getContext('2d');
-            equityChart = new Chart(equityCtx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Equity',
-                        data: [],
-                        borderColor: 'rgb(59, 130, 246)',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        fill: true
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            const pnlCtx = document.getElementById('pnl-chart').getContext('2d');
-            pnlChart = new Chart(pnlCtx, {
-                type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Daily P&L',
-                        data: [],
-                        backgroundColor: []
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-        }
-
-        // 加载初始数据
-        async function loadInitialData() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                updateDashboard(data);
-            } catch (e) {
-                console.error('Failed to load initial data:', e);
-            }
-        }
-
-        // 页面加载
-        document.addEventListener('DOMContentLoaded', () => {
-            initCharts();
-            loadInitialData();
-            initWebSocket();
-        });
-    </script>
+document.addEventListener('DOMContentLoaded',init);
+</script>
 </body>
-</html>
-"""
+</html>'''
 
 
 if FASTAPI_AVAILABLE:
     @app.get("/", response_class=HTMLResponse)
     async def root():
-        """主页"""
         return DASHBOARD_HTML
 
     @app.get("/api/status")
     async def get_status():
-        """获取系统状态"""
-        return {
-            "status": dashboard_state.to_dict(),
-            "metrics": {},
-            "positions": [],
-            "trades": [],
-            "alerts": []
-        }
+        return {"status": dashboard_state.to_dict(), "metrics": dashboard_state.metrics, "positions": dashboard_state.positions, "trades": dashboard_state.trades_history[-20:], "alerts": dashboard_state.alerts[-10:], "session": {"current_session": "regular", "can_trade": True}}
 
     @app.post("/api/trading/start")
-    async def start_trading():
-        """启动交易"""
+    async def start_trading(data: dict = None):
         dashboard_state.is_running = True
+        if data:
+            dashboard_state.symbols = data.get("symbols", ["TQQQ", "QQQ"])
         await manager.broadcast({"status": dashboard_state.to_dict()})
-        return {"success": True, "message": "Trading started"}
+        return {"success": True}
 
     @app.post("/api/trading/stop")
     async def stop_trading():
-        """停止交易"""
         dashboard_state.is_running = False
         await manager.broadcast({"status": dashboard_state.to_dict()})
-        return {"success": True, "message": "Trading stopped"}
+        return {"success": True}
 
     @app.get("/api/metrics")
     async def get_metrics():
-        """获取性能指标"""
-        return {
-            "total_equity": 50000.0,
-            "daily_return": 0.0,
-            "daily_pnl": 0.0,
-            "sharpe_ratio": 0.0,
-            "max_drawdown": 0.0,
-            "fill_rate": 0.0,
-            "avg_slippage": 0.0,
-            "daily_volume": 0.0,
-            "total_trades": 0
-        }
+        return dashboard_state.metrics
 
     @app.get("/api/positions")
     async def get_positions():
-        """获取当前持仓"""
-        return []
+        return dashboard_state.positions
 
     @app.get("/api/trades")
     async def get_trades(limit: int = 100):
-        """获取交易记录"""
-        return dashboard_state.trades_history[:limit]
+        return dashboard_state.trades_history[-limit:]
 
     @app.get("/api/alerts")
     async def get_alerts(limit: int = 50):
-        """获取告警列表"""
-        return dashboard_state.alerts[:limit]
+        return dashboard_state.alerts[-limit:]
 
     @app.get("/api/reports/generate")
     async def generate_report(format: str = "pdf"):
-        """生成报告"""
         try:
-            from reports.report_generator import (
-                ReportData, ReportConfig,
-                PDFReportGenerator, ExcelReportGenerator
-            )
-
-            # 准备报告数据
-            data = ReportData(
-                symbols=dashboard_state.symbols,
-                initial_equity=50000.0,
-                final_equity=50000.0,
-                total_return=0.0,
-                sharpe_ratio=0.0,
-                max_drawdown=0.0,
-                fill_rate=0.0,
-                avg_slippage=0.0,
-                trades=dashboard_state.trades_history
-            )
-
+            from reports.report_generator import ReportData, ReportConfig, PDFReportGenerator, ExcelReportGenerator
+            data = ReportData(symbols=dashboard_state.symbols, initial_equity=50000.0)
             config = ReportConfig(output_dir="./reports/output")
-
-            if format.lower() == "pdf":
-                generator = PDFReportGenerator(config)
-            elif format.lower() in ["excel", "xlsx"]:
-                generator = ExcelReportGenerator(config)
-            else:
-                return JSONResponse(
-                    status_code=400,
-                    content={"error": f"Unsupported format: {format}"}
-                )
-
-            filepath = generator.generate(data)
-            return FileResponse(
-                filepath,
-                filename=Path(filepath).name,
-                media_type="application/octet-stream"
-            )
-
+            gen = PDFReportGenerator(config) if format == "pdf" else ExcelReportGenerator(config)
+            filepath = gen.generate(data)
+            return FileResponse(filepath, filename=Path(filepath).name)
         except Exception as e:
-            logger.error(f"Report generation failed: {e}")
-            return JSONResponse(
-                status_code=500,
-                content={"error": str(e)}
-            )
+            return JSONResponse(status_code=500, content={"error": str(e)})
 
     @app.get("/api/health")
     async def get_health():
-        """获取系统健康状态"""
-        try:
-            from monitoring.system_dashboard import get_dashboard
-            return get_dashboard().get_system_health()
-        except Exception as e:
-            return {
-                "overall_status": "unknown",
-                "health_score": 0,
-                "error": str(e)
-            }
-
-    @app.get("/api/performance")
-    async def get_performance():
-        """获取性能监控数据"""
-        try:
-            from monitoring.performance_monitor import get_performance_monitor
-            return get_performance_monitor().get_summary()
-        except Exception as e:
-            return {"error": str(e)}
-
-    @app.get("/api/errors")
-    async def get_errors(limit: int = 50):
-        """获取错误日志"""
-        try:
-            from monitoring.error_tracker import get_error_tracker
-            errors = get_error_tracker().get_errors(limit=limit)
-            return [e.to_dict() for e in errors]
-        except Exception as e:
-            return {"error": str(e)}
+        return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
-        """WebSocket 实时推送"""
         await manager.connect(websocket)
         try:
             while True:
-                # 接收客户端消息
-                data = await websocket.receive_text()
-                # 广播状态更新
-                await manager.broadcast({
-                    "status": dashboard_state.to_dict(),
-                    "timestamp": datetime.now().isoformat()
-                })
+                await websocket.receive_text()
+                await manager.broadcast({"status": dashboard_state.to_dict(), "metrics": dashboard_state.metrics, "timestamp": datetime.now().isoformat()})
         except WebSocketDisconnect:
             manager.disconnect(websocket)
 
 
 def run_dashboard(host: str = "0.0.0.0", port: int = 8888):
-    """运行仪表盘服务器"""
     if not FASTAPI_AVAILABLE:
         logger.error("FastAPI not installed. Run: pip install fastapi uvicorn")
         return
-
     logger.info(f"Starting dashboard at http://{host}:{port}")
     uvicorn.run(app, host=host, port=port)
 
 
 async def push_update(data: Dict[str, Any]):
-    """推送更新到所有 WebSocket 客户端"""
     await manager.broadcast(data)
 
 
