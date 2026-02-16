@@ -1,5 +1,3 @@
-
-
 <div align="center">
   <picture>
       <img src="./assets/AI-Trader-log.png" width="20%" style="border: none; box-shadow: none;">
@@ -1097,3 +1095,40 @@ python run_tests.py --coverage
   <em> ❤️ Thanks for visiting ✨ AI-Trader!</em><br><br>
   <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.AI-Trader&style=for-the-badge&color=00d4ff" alt="Views">
 </p>
+
+## 🚀 GitHub Copilot Integration & OAuth Device Flow
+
+### Features
+- GitHub OAuth device flow for secure login and model invocation
+- Local encrypted token storage and auto-refresh
+- Multi-model configuration with support for both GitHub OAuth and API Key
+- Unified model invocation logic for seamless integration
+- Robust error handling and retry mechanism
+- Full compatibility with Windows, macOS, Linux
+- Security: token encryption, no hardcoded secrets
+
+### Usage
+1. On first run, if no GitHub token is cached, the terminal will prompt:
+   ```
+   请访问 https://github.com/login/device 并输入验证码: ABCD-EFGH
+   ```
+   Complete authorization in your browser. The system will auto-fetch the token.
+2. Subsequent runs will auto-load the cached token.
+3. Configure models in `configs/default_config.json`:
+   ```json
+   {
+     "models": [
+       {"name": "github-copilot/claude-3.5-sonnet", "auth_type": "github_oauth"},
+       {"name": "deepseek-chat-v3.1", "api_key": "${DEEPSEEK_API_KEY}", "auth_type": "api_key"}
+     ]
+   }
+   ```
+
+### Security Notes
+- Tokens are encrypted and stored locally.
+- API Keys are injected via environment variables.
+- No hardcoded secrets in code or configs.
+
+### Testing
+- Run `python -m unittest tests/test_github_auth.py` to verify authentication and token storage.
+

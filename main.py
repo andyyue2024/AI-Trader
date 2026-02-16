@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from pathlib import Path as _Path
 from dotenv import load_dotenv
@@ -10,7 +10,7 @@ load_dotenv()
 
 from prompts.agent_prompt import all_nasdaq_100_symbols
 # Import tools and prompts
-from tools.general_tools import get_config_value, write_config_value
+from tools.general_tools import write_config_value
 
 # Agent class mapping table - for dynamic import and instantiation
 AGENT_REGISTRY = {
@@ -196,7 +196,8 @@ async def main(config_path=None):
         signature = model_config.get("signature")
         openai_base_url = model_config.get("openai_base_url",None)
         openai_api_key = model_config.get("openai_api_key",None)
-        
+        auth_type = model_config.get("auth_type", "api_key")
+
         # Validate required fields
         if not basemodel:
             print(f"❌ Model {model_name} missing basemodel field")
@@ -265,7 +266,8 @@ async def main(config_path=None):
                     initial_cash=initial_cash,
                     init_date=INIT_DATE,
                     openai_base_url=openai_base_url,
-                    openai_api_key=openai_api_key
+                    openai_api_key=openai_api_key,
+                    auth_type=auth_type
                 )
             else:
                 agent = AgentClass(
@@ -279,7 +281,8 @@ async def main(config_path=None):
                     initial_cash=initial_cash,
                     init_date=INIT_DATE,
                     openai_base_url=openai_base_url,
-                    openai_api_key=openai_api_key
+                    openai_api_key=openai_api_key,
+                    auth_type=auth_type
                 )
 
             print(f"✅ {agent_type} instance created successfully: {agent}")

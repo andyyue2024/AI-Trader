@@ -20,6 +20,8 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 
+from agent.base_agent.github_copilot_client import GitHubCopilotClient
+
 # Best-effort import for a console/stdout callback handler across LangChain versions
 try:  # langchain <=0.1 style
     from langchain.callbacks.stdout import StdOutCallbackHandler as _ConsoleHandler  # type: ignore
@@ -235,7 +237,8 @@ class BaseAgent:
         initial_cash: float = 10000.0,
         init_date: str = "2025-10-13",
         market: str = "us",
-        verbose: bool = False
+        verbose: bool = False,
+        auth_type: str = "api_key"
     ):
         """
         Initialize BaseAgent
@@ -259,6 +262,7 @@ class BaseAgent:
         self.signature = signature
         self.basemodel = basemodel
         self.market = market
+        self.auth_type = auth_type
 
         # Auto-select stock symbols based on market if not provided
         if stock_symbols is None:
@@ -287,14 +291,18 @@ class BaseAgent:
         self.base_log_path = log_path or "./data/agent_data"
 
         # Set OpenAI configuration
-        if openai_base_url == None:
-            self.openai_base_url = os.getenv("OPENAI_API_BASE")
+        if self.auth_type == "github_oauth":
+            self.openai_base_url = None
+            self.openai_api_key = None
         else:
-            self.openai_base_url = openai_base_url
-        if openai_api_key == None:
-            self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        else:
-            self.openai_api_key = openai_api_key
+            if openai_base_url == None:
+                self.openai_base_url = os.getenv("OPENAI_API_BASE")
+            else:
+                self.openai_base_url = openai_base_url
+            if openai_api_key == None:
+                self.openai_api_key = os.getenv("OPENAI_API_KEY")
+            else:
+                self.openai_api_key = openai_api_key
 
         # Initialize components
         self.client: Optional[MultiServerMCPClient] = None
@@ -328,8 +336,13 @@ class BaseAgent:
         }
 
     async def initialize(self) -> None:
-        """Initialize MCP client and AI model"""
         print(f"🚀 Initializing agent: {self.signature}")
+        if self.auth_type == "github_oauth":
+            # Copilot分支：无需OpenAI Key，直接初始化Copilot客户端
+            self.model = None
+            self.agent = None
+            print("✅ Copilot模型初始化：无需OpenAI Key，仅依赖GitHub OAuth令牌")
+            return
 
         # Set LangChain verbose mode if enabled
         if self.verbose:
@@ -480,36 +493,33 @@ class BaseAgent:
             print(f"🔄 Step {current_step}/{self.max_steps}")
 
             try:
-                # Call agent
-                response = await self._ainvoke_with_retry(message)
-
-                # Extract agent response
-                agent_response = extract_conversation(response, "final")
-
-                # Check stop signal
+                if self.auth_type == "github_oauth":
+                    # Copilot分支直接调用chat_completion
+                    agent_response = self.chat_completion(message)
+                else:
+                    # 原有分支调用agent
+                    response = await self._ainvoke_with_retry(message)
+                    agent_response = extract_conversation(response, "final")
+                # 检查停止信号
                 if STOP_SIGNAL in agent_response:
                     print("✅ Received stop signal, trading session ended")
                     print(agent_response)
                     self._log_message(log_file, [{"role": "assistant", "content": agent_response}])
                     break
-
-                # Extract tool messages
-                tool_msgs = extract_tool_messages(response)
-                tool_response = "\n".join([msg.content for msg in tool_msgs])
-
-                # Prepare new messages
-                new_messages = [
-                    {"role": "assistant", "content": agent_response},
-                    {"role": "user", "content": f"Tool results: {tool_response}"},
-                ]
-
-                # Add new messages
+                # Copilot分支无需tool_msgs
+                if self.auth_type != "github_oauth":
+                    tool_msgs = extract_tool_messages(response)
+                    tool_response = "\n".join([msg.content for msg in tool_msgs])
+                    new_messages = [
+                        {"role": "assistant", "content": agent_response},
+                        {"role": "user", "content": f"Tool results: {tool_response}"},
+                    ]
+                else:
+                    new_messages = [{"role": "assistant", "content": agent_response}]
                 message.extend(new_messages)
-
-                # Log messages
                 self._log_message(log_file, new_messages[0])
-                self._log_message(log_file, new_messages[1])
-
+                if self.auth_type != "github_oauth" and len(new_messages) > 1:
+                    self._log_message(log_file, new_messages[1])
             except Exception as e:
                 print(f"❌ Trading session error: {str(e)}")
                 print(f"Error details: {e}")
@@ -686,6 +696,30 @@ class BaseAgent:
             "positions": latest_position.get("positions", {}),
             "total_records": len(positions),
         }
+
+    def chat_completion(self, prompt):
+        """
+        Unified model invocation: dispatch to Copilot API or API Key based on auth_type
+        """
+        if hasattr(self, 'auth_type') and self.auth_type == 'github_oauth':
+            # Use Copilot API
+            copilot_client = GitHubCopilotClient()
+            try:
+                return copilot_client.chat_completion(prompt)
+            except Exception as e:
+                print(f"❌ Copilot API调用失败: {e}")
+                # 引导重新授权或重试
+                raise
+        else:
+            # Use original API Key logic
+            if self.model:
+                try:
+                    return self.model.invoke(prompt)
+                except Exception as e:
+                    print(f"❌ API Key模型调用失败: {e}")
+                    raise
+            else:
+                raise RuntimeError("模型未初始化")
 
     def __str__(self) -> str:
         return (
