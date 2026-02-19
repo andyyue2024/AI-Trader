@@ -8,6 +8,7 @@ CACHE_PATH = Path.home() / ".cache" / "ai-trader" / "github_token.json"
 KEY_PATH = Path.home() / ".cache" / "ai-trader" / "key.bin"
 
 class GitHubDeviceAuth:
+
     def __init__(self):
         self.token = None
         self.key = self._load_or_create_key()
@@ -43,9 +44,9 @@ class GitHubDeviceAuth:
 
     def _get_client_id(self):
         import os
-        client_id = os.environ.get("GITHUB_CLIENT_ID")
+        client_id = os.environ.get("GITHUB_CLIENT_ID", "Ov23liNRx94mCarQrkeQ")
         if not client_id:
-            raise ValueError("GITHUB_CLIENT_ID environment variable not set. Please set it to your GitHub OAuth application's client_id.")
+            raise ValueError("GITHUB_CLIENT_ID environment variable not set.")
         return client_id
 
     def save_token(self, token):

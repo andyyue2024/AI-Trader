@@ -8,8 +8,8 @@
   "models": [
     {
       "name": "github-copilot/gpt-5",
-      "basemodel": "github-copilot/gpt-5",
-      "signature": "github-copilot/gpt-5",
+      "basemodel": "github-copilot/gpt-5.1",
+      "signature": "github-copilot/gpt-5.1",
       "auth_type": "github_oauth",
       "enabled": true
     },
