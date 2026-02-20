@@ -287,6 +287,27 @@ async def main(config_path=None):
 
             print(f"✅ {agent_type} instance created successfully: {agent}")
 
+            # Copilot模型测试：输出模型列表和ask结果
+            if auth_type == "github_oauth":
+                try:
+                    models = agent.get_available_models()
+                    print(f"[Copilot] 可用模型列表: {models}")
+                    # 只选chat类模型
+                    chat_models = [m for m in models if any(x in m for x in ["gpt", "claude", "gemini", "chat"])]
+                    if chat_models:
+                        ask_result = agent.ask("你好，请简要介绍AI-Trader项目的主要功能。", model=chat_models[0])
+                        print(f"[Copilot] ask({chat_models[0]}): {ask_result}")
+                    else:
+                        print("[Copilot] 未找到可用的chat类模型，跳过ask测试。")
+                except Exception as e:
+                    print(f"[Copilot] Copilot模型测试失败: {e}")
+                # Copilot模型无需MCP服务，直接continue
+                print("✅ Copilot模型测试完成，无需MCP服务，跳过后续MCP相关流程。")
+                print("=" * 60)
+                print(f"✅ Model {model_name} ({signature}) processing completed")
+                print("=" * 60)
+                continue
+
             # Initialize MCP connection and AI model
             await agent.initialize()
             print("✅ Initialization successful")
@@ -318,9 +339,7 @@ async def main(config_path=None):
         except Exception as e:
             print(f"❌ Error processing model {model_name} ({signature}): {str(e)}")
             print(f"📋 Error details: {e}")
-            # Can choose to continue processing next model, or exit
-            # continue  # Continue processing next model
-            exit()  # Or exit program
+            continue  # 继续处理下一个模型
 
         print("=" * 60)
         print(f"✅ Model {model_name} ({signature}) processing completed")

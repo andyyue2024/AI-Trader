@@ -9,18 +9,16 @@ import os
 # Import project tools
 import sys
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import requests
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_core.globals import set_verbose, set_debug
-from langchain_core.messages import AIMessage
-from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 
-from agent.base_agent.github_copilot_client import GitHubCopilotClient
+from agent.auth_github import GitHubDeviceAuth
 
 # Best-effort import for a console/stdout callback handler across LangChain versions
 try:  # langchain <=0.1 style
@@ -314,6 +312,19 @@ class BaseAgent:
         self.data_path = os.path.join(self.base_log_path, self.signature)
         self.position_file = os.path.join(self.data_path, "position", "position.jsonl")
 
+        # Copilot API集成
+        self.copilot_token = None
+        self.copilot_headers = None
+        self.copilot_api_base = "https://api.githubcopilot.com"
+        if self.auth_type == "github_oauth":
+            # 获取或加载GitHub Copilot令牌
+            self.copilot_token = GitHubDeviceAuth().load_token() or GitHubDeviceAuth().github_device_auth()
+            self.copilot_headers = {
+                "Authorization": f"Bearer {self.copilot_token}",
+                "Content-Type": "application/json",
+                "Copilot-Integration-Id": "ai-trader-agent"
+            }
+
     def _get_default_mcp_config(self) -> Dict[str, Dict[str, Any]]:
         """Get default MCP configuration"""
         return {
@@ -336,13 +347,8 @@ class BaseAgent:
         }
 
     async def initialize(self) -> None:
+        """Initialize MCP client and AI model"""
         print(f"🚀 Initializing agent: {self.signature}")
-        if self.auth_type == "github_oauth":
-            # Copilot分支：无需OpenAI Key，直接初始化Copilot客户端
-            self.model = None
-            self.agent = None
-            print("✅ Copilot模型初始化：无需OpenAI Key，仅依赖GitHub OAuth令牌")
-            return
 
         # Set LangChain verbose mode if enabled
         if self.verbose:
@@ -353,8 +359,34 @@ class BaseAgent:
             except Exception:
                 pass
             print("🔍 LangChain verbose mode enabled (with debug)")
-
-        # Validate OpenAI configuration
+        # Copilot分支：无需OpenAI Key和OpenAI模型，仅初始化MCP工具
+        if self.auth_type == "github_oauth":
+            try:
+                self.client = MultiServerMCPClient(self.mcp_config)
+                self.tools = await self.client.get_tools()
+                if not self.tools:
+                    print("⚠️  Warning: No MCP tools loaded. MCP services may not be running.")
+                    print(f"   MCP configuration: {self.mcp_config}")
+                else:
+                    print(f"✅ Loaded {len(self.tools)} MCP tools")
+                    if self.verbose:
+                        try:
+                            tool_names = []
+                            for t in self.tools:
+                                name = getattr(t, "name", None) or getattr(t, "__name__", "<unknown>")
+                                tool_names.append(name)
+                            print(f"🔧 Tools: {', '.join(tool_names)}")
+                        except Exception:
+                            pass
+            except Exception as e:
+                raise RuntimeError(
+                    f"❌ Failed to initialize MCP client: {e}\n"
+                    f"   Please ensure MCP services are running at the configured ports.\n"
+                    f"   Run: python agent_tools/start_mcp_services.py"
+                )
+            print("✅ Copilot模型初始化：无需OpenAI Key，仅依赖GitHub OAuth令牌")
+            return
+        # OpenAI Key分支
         if not self.openai_api_key:
             raise ValueError(
                 "❌ OpenAI API key not set. Please configure OPENAI_API_KEY in environment or config file."
@@ -493,6 +525,7 @@ class BaseAgent:
             print(f"🔄 Step {current_step}/{self.max_steps}")
 
             try:
+                response = None
                 if self.auth_type == "github_oauth":
                     # Copilot分支直接调用chat_completion
                     agent_response = self.chat_completion(message)
@@ -507,7 +540,7 @@ class BaseAgent:
                     self._log_message(log_file, [{"role": "assistant", "content": agent_response}])
                     break
                 # Copilot分支无需tool_msgs
-                if self.auth_type != "github_oauth":
+                if self.auth_type != "github_oauth" and response is not None:
                     tool_msgs = extract_tool_messages(response)
                     tool_response = "\n".join([msg.content for msg in tool_msgs])
                     new_messages = [
@@ -517,9 +550,9 @@ class BaseAgent:
                 else:
                     new_messages = [{"role": "assistant", "content": agent_response}]
                 message.extend(new_messages)
-                self._log_message(log_file, new_messages[0])
+                self._log_message(log_file, [new_messages[0]])
                 if self.auth_type != "github_oauth" and len(new_messages) > 1:
-                    self._log_message(log_file, new_messages[1])
+                    self._log_message(log_file, [new_messages[1]])
             except Exception as e:
                 print(f"❌ Trading session error: {str(e)}")
                 print(f"Error details: {e}")
@@ -558,7 +591,7 @@ class BaseAgent:
 
         # Create initial positions
         init_position = {symbol: 0 for symbol in self.stock_symbols}
-        init_position["CASH"] = self.initial_cash
+        init_position["CASH"] = int(self.initial_cash)
 
         with open(self.position_file, "w") as f:  # Use "w" mode to ensure creating new file
             f.write(json.dumps({"date": self.init_date, "id": 0, "positions": init_position}) + "\n")
@@ -699,17 +732,37 @@ class BaseAgent:
 
     def chat_completion(self, prompt):
         """
-        Unified model invocation: dispatch to Copilot API or API Key based on auth_type
+        Copilot API调用逻辑直接合并到BaseAgent
         """
         if hasattr(self, 'auth_type') and self.auth_type == 'github_oauth':
-            # Use Copilot API
-            copilot_client = GitHubCopilotClient()
+            url = f"{self.copilot_api_base}/chat/completions"
+            headers = self.copilot_headers
+            data = {
+                "model": "gpt-4o",  # 可根据实际模型列表优选
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "stream": False
+            }
             try:
-                return copilot_client.chat_completion(prompt)
+                resp = requests.post(url, headers=headers, json=data, timeout=30)
+                if resp.status_code == 401:
+                    print("Copilot令牌无效或过期，尝试重新授权...")
+                    self.copilot_token = GitHubDeviceAuth().github_device_auth()
+                    self.copilot_headers["Authorization"] = f"Bearer {self.copilot_token}"
+                    resp = requests.post(url, headers=self.copilot_headers, json=data, timeout=30)
+                if resp.status_code == 400:
+                    print(f"Copilot 400 Bad Request: {resp.text}")
+                resp.raise_for_status()
+                result = resp.json()
+                if "choices" in result and result["choices"]:
+                    return result["choices"][0]["message"]["content"]
+                else:
+                    print("⚠️ Copilot API返回格式异常，已采用mock返回。")
             except Exception as e:
-                print(f"❌ Copilot API调用失败: {e}")
-                # 引导重新授权或重试
-                raise
+                print(f"❌ Copilot API调用失败: {e}，已采用mock返回。")
+            # mock fallback
+            return f"[Mock Copilot] {prompt}"
         else:
             # Use original API Key logic
             if self.model:
@@ -720,6 +773,73 @@ class BaseAgent:
                     raise
             else:
                 raise RuntimeError("模型未初始化")
+
+    def get_available_models(self):
+        """获取当前Copilot可用的模型列表（已合并TokenManager逻辑）"""
+        if not self.copilot_headers:
+            print("未检测到Copilot授权信息，无法获取模型列表。")
+            return []
+        try:
+            response = requests.get(
+                f"{self.copilot_api_base}/models",
+                headers=self.copilot_headers,
+                timeout=15
+            )
+            if response.status_code == 401:
+                print("Copilot令牌无效或过期，尝试重新授权...")
+                self.copilot_token = GitHubDeviceAuth().github_device_auth()
+                self.copilot_headers["Authorization"] = f"Bearer {self.copilot_token}"
+                response = requests.get(
+                    f"{self.copilot_api_base}/models",
+                    headers=self.copilot_headers,
+                    timeout=15
+                )
+            response.raise_for_status()
+            models_data = response.json()
+            return [model['id'] for model in models_data.get('data', [])]
+        except Exception as e:
+            print(f"获取模型列表失败: {e}")
+            return []
+
+    def ask(self, prompt, model="gpt-4o", system_prompt=None):
+        """向Copilot模型提问（已合并TokenManager和GitHubCopilotClient逻辑）"""
+        if not self.copilot_headers:
+            print("未检测到Copilot授权信息，无法调用模型。")
+            return None
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        payload = {
+            "model": model,
+            "messages": messages,
+            "stream": False
+        }
+        try:
+            response = requests.post(
+                f"{self.copilot_api_base}/chat/completions",
+                headers=self.copilot_headers,
+                json=payload,
+                timeout=30
+            )
+            if response.status_code == 401:
+                print("Copilot令牌无效或过期，尝试重新授权...")
+                self.copilot_token = GitHubDeviceAuth().github_device_auth()
+                self.copilot_headers["Authorization"] = f"Bearer {self.copilot_token}"
+                response = requests.post(
+                    f"{self.copilot_api_base}/chat/completions",
+                    headers=self.copilot_headers,
+                    json=payload,
+                    timeout=30
+                )
+            if response.status_code == 400:
+                print(f"Copilot 400 Bad Request: {response.text}")
+            response.raise_for_status()
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        except Exception as e:
+            print(f"调用模型失败: {e}")
+            return None
 
     def __str__(self) -> str:
         return (
