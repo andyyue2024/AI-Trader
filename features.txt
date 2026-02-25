@@ -67,3 +67,16 @@ Grafana 仪表盘配置 ✅ 已完成 - docker/grafana/provisioning/dashboards/a
 3.14 零改动部署到 SPXL/SOXL/AAPL/期权 ✅ 已实现 - configs/config_manager.py
 
 
+
+四、Copilot OAuth
+以https://github.com/HKUDS/AI-Trader项目为基础，增加Copilot OAuth授权功能，允许用户通过GitHub账户登录并授权使用Copilot进行代码补全和建议。具体实现步骤如下：
+1. 在GitHub开发者设置中创建OAuth应用，获取Client ID和Client Secret
+2. 在AI-Trader项目中集成GitHub OAuth流程
+3. 在用户登录后，存储OAuth令牌以便后续调用Copilot API进行代码补全和建议
+4. 对AI-Trader的模型选择和代码生成模块进行修改，使其能够利用Copilot提供的建议来优化交易策略和代码质量
+   保留原有的模型选择和代码生成逻辑，作为备选方案，以确保在Copilot不可用时系统仍能正常运行
+
+
+
+
+

@@ -19,6 +19,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 
 from agent.auth_github import GitHubDeviceAuth
+from agent_tools.github_copilot_client import GithubCopilotClient
 
 # Best-effort import for a console/stdout callback handler across LangChain versions
 try:  # langchain <=0.1 style
@@ -307,23 +308,15 @@ class BaseAgent:
         self.tools: Optional[List] = None
         self.model: Optional[ChatOpenAI] = None
         self.agent: Optional[Any] = None
+        self.copilot_client = None
 
         # Data paths
         self.data_path = os.path.join(self.base_log_path, self.signature)
         self.position_file = os.path.join(self.data_path, "position", "position.jsonl")
 
-        # Copilot API集成
-        self.copilot_token = None
-        self.copilot_headers = None
-        self.copilot_api_base = "https://api.githubcopilot.com"
+        # Copilot API集成：如果使用GitHub OAuth认证，则初始化GithubCopilotClient
         if self.auth_type == "github_oauth":
-            # 获取或加载GitHub Copilot令牌
-            self.copilot_token = GitHubDeviceAuth().load_token() or GitHubDeviceAuth().github_device_auth()
-            self.copilot_headers = {
-                "Authorization": f"Bearer {self.copilot_token}",
-                "Content-Type": "application/json",
-                "Copilot-Integration-Id": "ai-trader-agent"
-            }
+            self.copilot_client = GithubCopilotClient()
 
     def _get_default_mcp_config(self) -> Dict[str, Dict[str, Any]]:
         """Get default MCP configuration"""
@@ -735,34 +728,7 @@ class BaseAgent:
         Copilot API调用逻辑直接合并到BaseAgent
         """
         if hasattr(self, 'auth_type') and self.auth_type == 'github_oauth':
-            url = f"{self.copilot_api_base}/chat/completions"
-            headers = self.copilot_headers
-            data = {
-                "model": "gpt-4o",  # 可根据实际模型列表优选
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "stream": False
-            }
-            try:
-                resp = requests.post(url, headers=headers, json=data, timeout=30)
-                if resp.status_code == 401:
-                    print("Copilot令牌无效或过期，尝试重新授权...")
-                    self.copilot_token = GitHubDeviceAuth().github_device_auth()
-                    self.copilot_headers["Authorization"] = f"Bearer {self.copilot_token}"
-                    resp = requests.post(url, headers=self.copilot_headers, json=data, timeout=30)
-                if resp.status_code == 400:
-                    print(f"Copilot 400 Bad Request: {resp.text}")
-                resp.raise_for_status()
-                result = resp.json()
-                if "choices" in result and result["choices"]:
-                    return result["choices"][0]["message"]["content"]
-                else:
-                    print("⚠️ Copilot API返回格式异常，已采用mock返回。")
-            except Exception as e:
-                print(f"❌ Copilot API调用失败: {e}，已采用mock返回。")
-            # mock fallback
-            return f"[Mock Copilot] {prompt}"
+            return self.copilot_client.chat_completion(prompt)
         else:
             # Use original API Key logic
             if self.model:
@@ -776,69 +742,16 @@ class BaseAgent:
 
     def get_available_models(self):
         """获取当前Copilot可用的模型列表（已合并TokenManager逻辑）"""
-        if not self.copilot_headers:
-            print("未检测到Copilot授权信息，无法获取模型列表。")
-            return []
-        try:
-            response = requests.get(
-                f"{self.copilot_api_base}/models",
-                headers=self.copilot_headers,
-                timeout=15
-            )
-            if response.status_code == 401:
-                print("Copilot令牌无效或过期，尝试重新授权...")
-                self.copilot_token = GitHubDeviceAuth().github_device_auth()
-                self.copilot_headers["Authorization"] = f"Bearer {self.copilot_token}"
-                response = requests.get(
-                    f"{self.copilot_api_base}/models",
-                    headers=self.copilot_headers,
-                    timeout=15
-                )
-            response.raise_for_status()
-            models_data = response.json()
-            return [model['id'] for model in models_data.get('data', [])]
-        except Exception as e:
-            print(f"获取模型列表失败: {e}")
+        if self.auth_type == 'github_oauth' and self.copilot_client:
+            return self.copilot_client.get_available_models()
+        else:
             return []
 
     def ask(self, prompt, model="gpt-4o", system_prompt=None):
         """向Copilot模型提问（已合并TokenManager和GitHubCopilotClient逻辑）"""
-        if not self.copilot_headers:
-            print("未检测到Copilot授权信息，无法调用模型。")
-            return None
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        payload = {
-            "model": model,
-            "messages": messages,
-            "stream": False
-        }
-        try:
-            response = requests.post(
-                f"{self.copilot_api_base}/chat/completions",
-                headers=self.copilot_headers,
-                json=payload,
-                timeout=30
-            )
-            if response.status_code == 401:
-                print("Copilot令牌无效或过期，尝试重新授权...")
-                self.copilot_token = GitHubDeviceAuth().github_device_auth()
-                self.copilot_headers["Authorization"] = f"Bearer {self.copilot_token}"
-                response = requests.post(
-                    f"{self.copilot_api_base}/chat/completions",
-                    headers=self.copilot_headers,
-                    json=payload,
-                    timeout=30
-                )
-            if response.status_code == 400:
-                print(f"Copilot 400 Bad Request: {response.text}")
-            response.raise_for_status()
-            result = response.json()
-            return result['choices'][0]['message']['content']
-        except Exception as e:
-            print(f"调用模型失败: {e}")
+        if self.auth_type == 'github_oauth' and self.copilot_client:
+            return self.copilot_client.ask(prompt, model=model, system_prompt=system_prompt)
+        else:
             return None
 
     def __str__(self) -> str:
